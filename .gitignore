@@ -1,0 +1,5 @@
+local_config.ini
+*.code-workspace
+*.swp
+__pycache__/
+*.pyc
