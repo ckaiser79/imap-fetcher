@@ -22,7 +22,7 @@ def main():
     parser.add_argument('--password')
     parser.add_argument('--inbox_folder')
     parser.add_argument('--archive_folder')
-    parser.add_argument('--parser_strategy', default='default_parser.DefaultPlainTextParser')
+    parser.add_argument('--parser_strategy')
 
     parser.add_argument('--list', action='store_true')
     parser.add_argument('--process_all', action='store_true',  help="Process all emails in the inbox and delgate to strategy parser")

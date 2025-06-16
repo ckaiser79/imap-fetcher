@@ -1,6 +1,6 @@
 import imaplib
 import email
-
+from email.message import Message
 
 class IMAPClient:
     def __init__(self, config):
@@ -35,7 +35,7 @@ class IMAPClient:
 
     def fetch_email(self, mail_id):
         self.conn.select(self.config.get("inbox_folder"))
-        _, data = self.conn.fetch(mail_id, '(RFC822)')
+        _, data = self.conn.fetch(str(mail_id), '(RFC822)')
         return email.message_from_bytes(data[0][1])
 
     def get_all_mail_ids(self):

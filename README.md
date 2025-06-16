@@ -4,14 +4,14 @@
 ```bash
 
 # Emails auflisten
-python imap_client.py --list
+python3 -m main --list
 
 # E-Mail ID 5 herunterladen
-python imap_client.py --download 5
+python3 -m main --download 5
 
 # E-Mail ID 5 ins Archiv verschieben
-python imap_client.py --archive 5
+python3 -m main --archive 5
 
 # Konfiguration überschreiben
-python imap_client.py --list --username new@domain.com --password geheim123
+python3 -m main --list --username new@domain.com --password geheim123
 ```

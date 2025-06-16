@@ -1,5 +1,5 @@
 from email.message import Message
-from parser_strategy import EmailParserStrategy
+from lib.parser_strategy import EmailParserStrategy
 
 class DefaultPlainTextParser(EmailParserStrategy):
     def parse(self, msg: Message) -> None:
