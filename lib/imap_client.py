@@ -45,7 +45,9 @@ class IMAPClient:
 
     def move_to_archive(self, mail_id):
         archive = self.config.get("archive_folder")
-        self.conn.copy(mail_id, archive)
-        self.conn.store(mail_id, '+FLAGS', '\\Deleted')
+        self.conn.select(self.config.get("inbox_folder"))
+        self.conn.copy(str(mail_id), archive)
+        self.conn.store(str(mail_id), '+FLAGS', '\\Deleted')
         self.conn.expunge()
-        print(f"Mail {mail_id.decode()} archived.")
+        if self.config.get_bool("verbose"):
+          print(f"Mail {mail_id} archived.")

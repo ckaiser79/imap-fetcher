@@ -1,4 +1,4 @@
 #!/bin/bash
 
 cd ..
-./main.py --config ./local_config.ini --verbose --download 1
+./main.py --config ./local_config.ini --verbose --archive 1

@@ -7,7 +7,7 @@ class Configuration:
         "imap_port": 993,
         "username": None,
         "password": None,
-        "parser_strategy": "default_parser.DefaultPlainTextParser",
+        "parser_strategy": "lib.default_parser.DefaultPlainTextParser",
         "inbox_folder": "INBOX",
         "archive_folder": "Archive",
         "error_dir": "failed_emails",
