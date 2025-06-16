@@ -1,7 +1,9 @@
+#!env python3
+# -*- coding: utf-8 -*-
 import argparse
-from config import Configuration
-from imap_client import IMAPClient
-from process import MailProcessor
+from lib.config import Configuration
+from lib.imap_client import IMAPClient
+from lib.process import MailProcessor
 from importlib import import_module
 
 
@@ -27,14 +29,14 @@ def main():
     parser.add_argument('--download', type=int, help="Download email by ID")
     parser.add_argument('--archive')
     parser.add_argument('--clear_archive', action='store_true')
-    parser.add_argument('--help', action='store_true', help="Print usage and exit")
+    #parser.add_argument('--help', action='store_true', help="Print usage and exit")
     parser.add_argument('--verbose', action='store_true', help="Enable verbosity mode")
 
     args = parser.parse_args()
 
-    if args.help:
-       parser.print_help()
-       exit(2)
+    #if args.help:
+    #   parser.print_help()
+    #   exit(2)
 
     config = Configuration(
         ini_path=args.config,
@@ -42,18 +44,16 @@ def main():
         cli_args=vars(args)
     )
 
-    try:
+    parser_strategy = None
+    if config.get_bool("process_all") or config.exists("download"):    
         parser_strategy = load_parser(config.get("parser_strategy"))
-    except Exception as e:
-        print(f"Error loading parser strategy: {e}")
-        return
-
+        
     client = IMAPClient(config)
     try:
         client.login()
 
         if config.get_bool("process_all"):
-            processor = MailProcessor(client, parser, config)
+            processor = MailProcessor(client, parser_strategy, config)
             processor.process_all()
             return
         else:
@@ -62,7 +62,14 @@ def main():
                 client.list_emails()
             elif args.download:
                 message = client.fetch_email(config.get_int("download"))
-                print(f"Downloaded email:\n{message.as_string()}")
+                if message is None:
+                    print(f"Email with ID {args.download} not found.")
+                    return
+                if config.get_bool("verbose"):
+                    print(f"Downloaded email:\n{message.as_string()}")
+
+                if parser_strategy != None:
+                  parser_strategy.parse(message)
             elif args.archive:
                 client.move_to_archive(config.get_int("archive"))
     finally:
