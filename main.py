@@ -23,12 +23,12 @@ def main():
     parser.add_argument('--inbox_folder')
     parser.add_argument('--archive_folder')
     parser.add_argument('--parser_strategy')
+    parser.add_argument('--error_dir', help="Directory to save failed emails")
 
     parser.add_argument('--list', action='store_true')
     parser.add_argument('--process_all', action='store_true',  help="Process all emails in the inbox and delgate to strategy parser")
     parser.add_argument('--download', type=int, help="Download email by ID")
     parser.add_argument('--archive')
-    parser.add_argument('--clear_archive', action='store_true')
     #parser.add_argument('--help', action='store_true', help="Print usage and exit")
     parser.add_argument('--verbose', action='store_true', help="Enable verbosity mode")
 
@@ -48,14 +48,19 @@ def main():
     if config.get_bool("process_all") or config.exists("download"):    
         parser_strategy = load_parser(config.get("parser_strategy"))
         
+    result: int = 0
+
     client = IMAPClient(config)
     try:
         client.login()
 
         if config.get_bool("process_all"):
             processor = MailProcessor(client, parser_strategy, config)
-            processor.process_all()
-            return
+            try:
+                processor.process_all()
+            except Exception as e:
+                print(f"Error processing emails: {e}")
+                result = 2
         else:
     
             if config.get_bool("list"):
@@ -74,6 +79,8 @@ def main():
                 client.move_to_archive(config.get_int("archive"))
     finally:
         client.disconnect()
+
+    exit(result)
 
 if __name__ == "__main__":
     main()

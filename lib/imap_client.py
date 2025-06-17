@@ -27,21 +27,35 @@ class IMAPClient:
                 print("Disconnected.")
 
     def list_emails(self):
-        self.conn.select(self.config.get("inbox_folder"))
-        _, data = self.conn.search(None, 'ALL')
-        for num in data[0].split():
-            _, msg_data = self.conn.fetch(num, '(BODY.PEEK[HEADER.FIELDS (SUBJECT FROM DATE)])')
-            print(f"\nID: {num.decode()}\n{msg_data[0][1].decode().strip()}")
+        id_list = self.get_all_mail_ids()
 
-    def fetch_email(self, mail_id):
+        for num in id_list:
+            _, msg_data = self.conn.fetch(str(num), '(BODY.PEEK[HEADER.FIELDS (SUBJECT FROM DATE)])')
+            message = msg_data[0][1].decode()
+            print(f"\nID: {num}\n{message.strip()}")
+
+    def select_inbox(self):
         self.conn.select(self.config.get("inbox_folder"))
+        if self.config.get_bool("verbose"):
+            print(f"Selected inbox folder: {self.config.get('inbox_folder')}")
+
+    def _fetch(self, mail_id: int) -> Message:
         _, data = self.conn.fetch(str(mail_id), '(RFC822)')
         return email.message_from_bytes(data[0][1])
+    
+    def fetch_email(self, mail_id: int) -> Message:
+        self.conn.select(self.config.get("inbox_folder"))
+        return self._fetch(mail_id)
 
-    def get_all_mail_ids(self):
+    def get_all_mail_ids(self) -> list[int]:
+
         self.conn.select(self.config.get("inbox_folder"))
         _, data = self.conn.search(None, 'ALL')
-        return data[0].split()
+
+        str_ids = data[0].split()
+        result = list(map(int, str_ids))
+
+        return result
 
     def move_to_archive(self, mail_id):
         archive = self.config.get("archive_folder")

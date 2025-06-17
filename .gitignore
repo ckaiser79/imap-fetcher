@@ -3,3 +3,5 @@ local_config.ini
 *.swp
 __pycache__/
 *.pyc
+vendor/
+failed_emails/
