@@ -46,7 +46,7 @@ def main():
         cli_args=vars(args)
     )
 
-    setup_logging(config)
+    logger = setup_logging(config)
 
     parser_strategy = None
     if config.get_bool("process_all") or config.exists("download"):    
@@ -63,6 +63,7 @@ def main():
             try:
                 processor.process_all()
             except Exception as e:
+                logger.error(f"Error processing emails: {e}")
                 print(f"Error processing emails: {e}")
                 result = 2
         else:
