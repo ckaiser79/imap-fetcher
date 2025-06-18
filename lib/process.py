@@ -1,5 +1,7 @@
 import os
 from email.policy import default
+from lib.custom_exceptions import UnparseableEmailException
+from lib.setup_logger import logger
 
 
 class MailProcessor:
@@ -11,11 +13,10 @@ class MailProcessor:
         self.error_dir = self.config.get("error_dir")
         os.makedirs(self.error_dir, exist_ok=True)
 
-    def process_all(self) -> int:
-        print("Processing inbox...")
+    def process_all(self) -> None:
 
         email_ids: list[int] = self.imap_client.get_all_mail_ids() 
-        print(f"Found {len(email_ids)} emails to process.\n")
+        logger.info(f"Found {len(email_ids)} emails to process.\n")
         if len(email_ids) == 0:
             return 0
         
@@ -34,17 +35,15 @@ class MailProcessor:
                 
                 if archive_ready:
                     self.imap_client.move_to_archive(mail_id)
-                    if self.config.get_bool("verbose"):
-                        print("✓ Mail archived ID {mail_id}.\n")
+                    logger.debug("✓ Mail archived ID {mail_id}.\n")
                     archived  += 1
 
             except Exception as e:
-                if self.config.get_bool("verbose"):
-                    print(f"✗ Failed to process mail ID {mail_id}: {e}")
+                logger.warning(f"✗ Failed to process mail ID {mail_id}: {e}")
                 self._save_failed_email(mail_id, message)
                 failures += 1
 
-        print(f"\nProcessed {len(email_ids)} emails with {failures} failures.")
+        logger.info(f"\nProcessed {len(email_ids)} emails with {failures} failures.")
         if failures > 0:
             raise Exception(f"\n{failures} emails failed to process. Check {self.error_dir} for details or rerun.")
 
@@ -53,23 +52,22 @@ class MailProcessor:
         try:
             self.parser_strategy.parse(message)
             archive_ready = True
-        except Exception as e:
+        except UnparseableEmailException as e:
             archive_ready = False
-            print(f"✗ Failed to parse email ID {mail_id}: {e.__class__.__name__} - {e}")
+            logger.warn(f"✗ Failed to parse email ID {mail_id}: {e.__class__.__name__} - {e}")
 
         return archive_ready
 
     def _save_failed_email(self, mail_id, message):
 
         if not message:
-            print(f"No message to save for mail ID {mail_id}.")
+            logger.warning(f"No message to save for mail ID {mail_id}.")
             return
         
-        print(f"Saving failed email {mail_id} to {self.error_dir}...")
+        logger.info(f"Saving failed email {mail_id} to {self.error_dir}...")
         path = os.path.join(self.error_dir, f"email_{mail_id}.eml")
         try:
             with open(path, "wb") as f:
                 f.write(message.as_bytes(policy=default))
-            print(f"Saved failed email to {path}\n")
         except Exception as e:
-            print(f"Failed to save email {mail_id}: {e}")
+            logger.error(f"Failed to save email {mail_id}: {e}")

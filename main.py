@@ -5,7 +5,7 @@ from lib.config import Configuration
 from lib.imap_client import IMAPClient
 from lib.process import MailProcessor
 from importlib import import_module
-
+from lib.setup_logger import setup_logging
 
 def load_parser(strategy_path: str):
     module_name, class_name = strategy_path.rsplit(".", 1)
@@ -32,6 +32,8 @@ def main():
     #parser.add_argument('--help', action='store_true', help="Print usage and exit")
     parser.add_argument('--verbose', action='store_true', help="Enable verbosity mode")
 
+    parser.add_argument('--log_file')
+
     args = parser.parse_args()
 
     #if args.help:
@@ -43,6 +45,8 @@ def main():
         env_prefix="IMAP_FETCH_",
         cli_args=vars(args)
     )
+
+    setup_logging(config)
 
     parser_strategy = None
     if config.get_bool("process_all") or config.exists("download"):    

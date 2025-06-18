@@ -11,6 +11,7 @@ class Configuration:
         "inbox_folder": "INBOX",
         "archive_folder": "Archive",
         "error_dir": "failed_emails",
+        "log_file": "imap-fetcher.log",
 
         "list": False,
         "process_all": False,

@@ -5,3 +5,4 @@ __pycache__/
 *.pyc
 vendor/
 failed_emails/
+*.log
