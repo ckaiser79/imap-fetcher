@@ -1,6 +1,7 @@
 import imaplib
 import email
 from email.message import Message
+from lib.setup_logger import logger
 
 class IMAPClient:
     def __init__(self, config):
@@ -11,20 +12,19 @@ class IMAPClient:
         )
 
     def login(self):
-        print(f"Login to {self.config.get('imap_server')}...")
+        logger.debug(f"Login to {self.config.get('imap_server')}...")
         
         self.conn.login(
             self.config.get("username"),
             self.config.get("password")
         )
-        if self.config.get_bool("verbose"):
-            print("Connected.")
+        
+        logger.debug("Connected.")
 
     def disconnect(self):
         if self.conn:
             self.conn.logout()
-            if self.config.get_bool("verbose"):
-                print("Disconnected.")
+            logger.debug("Disconnected.")
 
     def list_emails(self):
         id_list = self.get_all_mail_ids()
@@ -32,12 +32,11 @@ class IMAPClient:
         for num in id_list:
             _, msg_data = self.conn.fetch(str(num), '(BODY.PEEK[HEADER.FIELDS (SUBJECT FROM DATE)])')
             message = msg_data[0][1].decode()
-            print(f"\nID: {num}\n{message.strip()}")
+            logger.debug(f"\nID: {num}\n{message.strip()}")
 
     def select_inbox(self):
         self.conn.select(self.config.get("inbox_folder"))
-        if self.config.get_bool("verbose"):
-            print(f"Selected inbox folder: {self.config.get('inbox_folder')}")
+        logger.debug(f"Selected inbox folder: {self.config.get('inbox_folder')}")
 
     def _fetch(self, mail_id: int) -> Message:
         _, data = self.conn.fetch(str(mail_id), '(RFC822)')
@@ -63,5 +62,5 @@ class IMAPClient:
         self.conn.copy(str(mail_id), archive)
         self.conn.store(str(mail_id), '+FLAGS', '\\Deleted')
         self.conn.expunge()
-        if self.config.get_bool("verbose"):
-          print(f"Mail {mail_id} archived.")
+        
+        logger.debug(f"Mail {mail_id} archived.")

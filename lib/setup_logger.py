@@ -8,4 +8,5 @@ def setup_logging(config: Configuration) -> None:
        log_level = logging.DEBUG
     else:
         log_level = logging.INFO
+        
     logging.basicConfig(filename=config.get('log_file'), filemode='w', level=log_level, encoding='utf-8')

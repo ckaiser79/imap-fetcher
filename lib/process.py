@@ -54,7 +54,7 @@ class MailProcessor:
             archive_ready = True
         except UnparseableEmailException as e:
             archive_ready = False
-            logger.warn(f"✗ Failed to parse email ID {mail_id}: {e.__class__.__name__} - {e}")
+            logger.warning(f"✗ Failed to parse email ID {mail_id}: {e.__class__.__name__} - {e}")
 
         return archive_ready
 
