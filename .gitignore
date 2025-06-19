@@ -7,3 +7,7 @@ vendor/*.py
 !vendor/__init__.py
 failed_emails/
 *.log
+*.zip
+*.tar.gz
+*.tgz
+target/
