@@ -13,9 +13,6 @@ class Configuration:
         "error_dir": "failed_emails",
         "log_file": "imap-fetcher.log",
 
-        "list": False,
-        "process_all": False,
-        "download": None,
     }
 
     def __init__(self, ini_path=None, env_prefix="", cli_args=None):
@@ -30,10 +27,12 @@ class Configuration:
         value = self.get_optional(key)
         return value is not None
 
-    def get_optional(self, key) -> str | None:
+    def get_optional(self, key: str) -> str | None:
         # 1. CLI argument
         if key in self.cli_args and self.cli_args[key] is not None:
             return str(self.cli_args[key])
+
+        key = key.replace('-', '_')
 
         # 2. Environment variable
         env_key = f"{self.env_prefix}{key}".upper()
@@ -65,6 +64,9 @@ class Configuration:
 
 
     def get_bool(self, key) -> bool:
+        if(not self.exists(key)):
+            return False
+        
         value = self.get(key).lower()
         if value in ['true', '1', 'yes']:
             return True

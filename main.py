@@ -9,38 +9,35 @@ from lib.setup_logger import setup_logging
 from lib.parser_strategy import EmailParserStrategy
 from lib.default_parser import DefaultPlainTextParser
 
-def load_parser(strategy_path: str):
+def load_parser(config: Configuration) -> EmailParserStrategy:
+    strategy_path: str = config.get("parser_strategy")
     module_name, class_name = strategy_path.rsplit(".", 1)
     module = import_module(module_name)
-    return getattr(module, class_name)()
-
+    return getattr(module, class_name)(config)
 
 def main():
     parser = argparse.ArgumentParser(description="IMAP CLI Client")
     parser.add_argument('--config', default='config.ini', help="INI config file")
-    parser.add_argument('--imap_server')
-    parser.add_argument('--imap_port', type=int)
+    parser.add_argument('--imap-server')
+    parser.add_argument('--imap-port', type=int)
     parser.add_argument('--username')
     parser.add_argument('--password')
-    parser.add_argument('--inbox_folder')
-    parser.add_argument('--archive_folder')
-    parser.add_argument('--parser_strategy')
-    parser.add_argument('--error_dir', help="Directory to save failed emails")
+    parser.add_argument('--inbox-folder')
+    parser.add_argument('--archive-folder')
+    parser.add_argument('--parser-strategy')
+    parser.add_argument('--error-dir', help="Directory to save failed emails")
 
     parser.add_argument('--list', action='store_true')
-    parser.add_argument('--process_all', action='store_true',  help="Process all emails in the inbox and delgate to strategy parser")
-    parser.add_argument('--download', type=int, help="Download email by ID")
-    parser.add_argument('--archive')
-    #parser.add_argument('--help', action='store_true', help="Print usage and exit")
+    parser.add_argument('--list-directories', action='store_true')
+    
+    parser.add_argument('--process-all', action='store_true',  help="Process all emails in the inbox and delgate to strategy parser")
+    parser.add_argument('--download', help="Download email by is mail id (integer) and parse it with strategy parser")
+    parser.add_argument('--archive', help="Move email with field Message-ID to archive folder")
     parser.add_argument('--verbose', action='store_true', help="Enable verbosity mode")
 
-    parser.add_argument('--log_file')
+    parser.add_argument('--log-file')
 
     args = parser.parse_args()
-
-    #if args.help:
-    #   parser.print_help()
-    #   exit(2)
 
     config = Configuration(
         ini_path=args.config,
@@ -50,9 +47,9 @@ def main():
 
     logger = setup_logging(config)
 
-    parser_strategy: EmailParserStrategy = DefaultPlainTextParser()
+    parser_strategy: EmailParserStrategy = DefaultPlainTextParser(config)
     if config.get_bool("process_all") or config.exists("download"):    
-        parser_strategy = load_parser(config.get("parser_strategy"))
+        parser_strategy = load_parser(config)
         
     result: int = 0
 
@@ -70,18 +67,32 @@ def main():
             client.login()
     
             if config.get_bool("list"):
-                client.list_emails()
-            elif args.download:
-                message = client.fetch_email(config.get_int("download"))
+                messages = client.list_emails()
+                for message in messages:
+                    print(message)
+            elif config.get_bool("list_directories"):
+                directories = client.list_directories()
+                for directory in directories:
+                    print(directory)
+            elif config.exists("download"):
+                download_mail_id: int = config.get_int("download")
+                message = client.fetch_email_from_inbox(download_mail_id)
                 if message is None:
-                    print(f"Email with ID {args.download} not found.")
+                    print(f"Email with ID {download_mail_id} not found in {config.get("inbox_folder")}.")
                     return
-                if config.get_bool("verbose"):
-                    print(f"Downloaded email:\n{message.as_string()}")
-
+                
+                logger.debug(f"{message.as_string()}")
                 parser_strategy.parse(message)
-            elif args.archive:
-                client.move_to_archive(config.get_int("archive"))
+
+            elif config.exists("archive"):
+                download_mail_id: int = config.get_int("archive")
+                message = client.fetch_email_from_inbox(download_mail_id)
+
+                uid = message.get("X-IMAP-Fetcher-UID")
+                if uid is None:
+                    print(f"Email with Mail ID {download_mail_id} not found in {config.get('inbox_folder')}.")
+                else:
+                    client.move_to_archive(uid)
         finally:
             client.disconnect()
 

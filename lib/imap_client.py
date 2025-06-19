@@ -11,7 +11,7 @@ class IMAPClient:
             self.config.get_int("imap_port")
         )
 
-    def search_uid(self, message_id: str) -> str | None:
+    def search_uid_by_message_id(self, message_id: str) -> str | None:
         """message_id is the Message-ID header value"""
         logger.debug(f"Searching UID for message with ID: {message_id}")
 
@@ -43,8 +43,11 @@ class IMAPClient:
         result = list()
         for num in id_list:
             _, msg_data = self.conn.fetch(str(num), '(BODY.PEEK[HEADER.FIELDS (MESSAGE-ID SUBJECT FROM DATE)])')
+            
             message = msg_data[0][1].decode()
+            
             logger.debug(f"{num}: {message.strip()}")
+            message = "X-IMAP-Fetcher-Mail-ID: " + str(num) + "\n" + message.strip()
             result.append(message)
         return result
 
@@ -52,14 +55,25 @@ class IMAPClient:
         self.conn.select(self.config.get("inbox_folder"))
         logger.debug(f"Selected inbox folder: {self.config.get('inbox_folder')}")
 
-    def _fetch(self, mail_id: int) -> Message:
+    def fetch(self, mail_id: int) -> Message:
+        
         _, data = self.conn.fetch(str(mail_id), '(RFC822)')
-        return email.message_from_bytes(data[0][1])
+
+        message: Message = email.message_from_bytes(data[0][1])
+        message.add_header("X-IMAP-Fetcher-Mail-ID", str(mail_id))
+
+        if message.get('Message-ID'):
+            message_id: str | None = message.get('Message-ID')
+            if message_id:
+                uid: str | None = self.search_uid_by_message_id(message_id)
+                message.add_header("X-IMAP-Fetcher-UID", str(uid))
+
+        return message
     
-    def fetch_email(self, mail_id: int) -> Message:
+    def fetch_email_from_inbox(self, mail_id: int) -> Message:
         """Fetch an email by its ID returned by get_all_mail_ids."""
         self.conn.select(self.config.get("inbox_folder"))
-        return self._fetch(mail_id)
+        return self.fetch(mail_id)
 
     def get_all_mail_ids(self) -> list[int]:
 
@@ -79,3 +93,14 @@ class IMAPClient:
         self.conn.expunge()
         
         logger.debug(f"Mail {uid} archived to '{archive}'.")
+
+    def list_directories(self) -> list[str]:
+        """List all directories (folders) in the IMAP account."""
+        result, data = self.conn.list()
+        if result != 'OK':
+            logger.error(f"Failed to list directories: {data}")
+            return []
+        
+        directories = [line.decode().split(' "/" ')[-1] for line in data]
+        logger.debug(f"Directories: {directories}")
+        return directories

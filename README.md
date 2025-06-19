@@ -6,19 +6,22 @@ Downloads emails from an IMAP mailbox for further processing and saves processed
 
 ```bash
 
-# Emails auflisten
+# List Emails in INBOX
 python3 -m main --list
 
-# E-Mail ID 5 herunterladen
-python3 -m main --download 5
+# List all fqn of the directories on the server
+python3 -m main --list-directories
+
+# Get details of a single email inkl. their internal IDs
+python3 -m main --download 3 --parser-strategy lib.default_parser.DefaultPlainTextParser
 
 # E-Mail ID 5 ins Archiv verschieben
-python3 -m main --archive 5
+python3 -m main --archive 1
 
-# Konfiguration überschreiben
+# Overwrite configuration using command line
 python3 -m main --list --username new@domain.com --password geheim123
 
 
-# Download, tranform and archive emails
-python3 -m main --process_all --parser_strategy vendor.my_parser.MyParser
+# Download, tranform and archive emails using a custom parser
+python3 -m main --process-all --parser-strategy vendor.my_parser.MyParser
 ```

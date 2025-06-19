@@ -16,6 +16,7 @@ class MailProcessor:
         self.config = config
 
         self.retry_count: int = 0
+        self.max_retries: int = 5
         
         self.error_dir = self.config.get("error_dir")
         os.makedirs(self.error_dir, exist_ok=True)
@@ -32,7 +33,7 @@ class MailProcessor:
         
         imap_client.select_inbox()
         for mail_id in email_ids:
-            message = imap_client._fetch(mail_id)
+            message = imap_client.fetch(mail_id)
             logger.debug(f"Fetched email ID {mail_id} with Message-ID: {message.get('Message-ID')}")
             result.append(message)
 
@@ -40,14 +41,14 @@ class MailProcessor:
 
     def process_all(self) -> None:
 
-        if self.retry_count > 5:   
+        if self.retry_count > self.max_retries:   
             logger.error("Too many retries, giving up.")
             return
 
         try:
             self._process_all()
         except Exception as e:
-            logger.warning(f"Error processing emails: {e}")
+            logger.warning(f"Error processing emails: {e.__class__} {e}")
             self.retry_count += 1
             logger.info(f"Retrying... ({self.retry_count})")
             self.process_all()
@@ -63,20 +64,20 @@ class MailProcessor:
 
             for message in inbox_messages:
                 message_id_header = message['Message-ID']
+                subject = message['Subject']
 
-                logger.debug(f"Processing email ID {message_id_header}...")
+                logger.info(f"Processing email ID {message_id_header}, '{subject}'")
 
                 archive_ready: bool = self.parse_message(message)
-                logger.debug(f"Email ID {message_id_header} archive ready: {archive_ready}")
                 
                 if archive_ready:
 
-                    message_uid = imap_client.search_uid(message_id_header)
+                    message_uid = imap_client.search_uid_by_message_id(message_id_header)
                     if message_uid is None:
-                        raise Exception(f"Message UID not found for ID {message_id_header}, archiving skipped")
-                    
-                    imap_client.move_to_archive(message_uid)
-                    logger.debug(f"Mail archived ID {message_id_header}.")    
+                        logger.error(f"Message UID not found for ID {message_id_header}, archiving skipped")
+                    else:
+                        imap_client.move_to_archive(message_uid)
+                        logger.debug(f"Mail archived ID {message_id_header}.")    
         finally:
             imap_client.disconnect()   
         
