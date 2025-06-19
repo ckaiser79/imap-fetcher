@@ -1,60 +1,93 @@
 import os
 from email.policy import default
+from email.message import Message
 from lib.custom_exceptions import UnparseableEmailException
 from lib.setup_logger import logger
 
+from lib.imap_client import IMAPClient
+from lib.parser_strategy import EmailParserStrategy
+from lib.config import Configuration
+
 
 class MailProcessor:
-    def __init__(self, imap_client, parser_strategy, config):
-        self.imap_client = imap_client
+    def __init__(self, parser_strategy: EmailParserStrategy, config: Configuration):
+        
         self.parser_strategy = parser_strategy
         self.config = config
 
+        self.retry_count: int = 0
+        
         self.error_dir = self.config.get("error_dir")
         os.makedirs(self.error_dir, exist_ok=True)
 
+    def fetch_emails(self, imap_client: IMAPClient) -> list[Message]:
+        
+        email_ids: list[int] = imap_client.get_all_mail_ids() 
+        logger.info(f"Found {len(email_ids)} emails to process.\n")
+
+        result: list[Message] = list()
+
+        if len(email_ids) == 0:
+            return result
+        
+        imap_client.select_inbox()
+        for mail_id in email_ids:
+            message = imap_client._fetch(mail_id)
+            logger.debug(f"Fetched email ID {mail_id} with Message-ID: {message.get('Message-ID')}")
+            result.append(message)
+
+        return result
+
     def process_all(self) -> None:
 
-        email_ids: list[int] = self.imap_client.get_all_mail_ids() 
-        logger.info(f"Found {len(email_ids)} emails to process.\n")
-        if len(email_ids) == 0:
-            return 0
-        
-        self.imap_client.select_inbox()
-        
-        failures: int = 0
-        archived : int = 0
+        if self.retry_count > 5:   
+            logger.error("Too many retries, giving up.")
+            return
 
-        for mail_id in email_ids:
-            message = None
-            try:
-                
-                message = self.imap_client._fetch(mail_id)
+        try:
+            self._process_all()
+        except Exception as e:
+            logger.warning(f"Error processing emails: {e}")
+            self.retry_count += 1
+            logger.info(f"Retrying... ({self.retry_count})")
+            self.process_all()
 
-                archive_ready: bool = self.parse_message(message, mail_id)
+    def _process_all(self) -> None:
+     
+        imap_client = IMAPClient(self.config)
+        imap_client.login()
+
+        try:
+            inbox_messages = self.fetch_emails(imap_client)
+            logger.debug(f"Fetched {len(inbox_messages)} emails from inbox.")
+
+            for message in inbox_messages:
+                message_id_header = message['Message-ID']
+
+                logger.debug(f"Processing email ID {message_id_header}...")
+
+                archive_ready: bool = self.parse_message(message)
+                logger.debug(f"Email ID {message_id_header} archive ready: {archive_ready}")
                 
                 if archive_ready:
-                    self.imap_client.move_to_archive(mail_id)
-                    logger.debug("✓ Mail archived ID {mail_id}.\n")
-                    archived  += 1
 
-            except Exception as e:
-                logger.warning(f"✗ Failed to process mail ID {mail_id}: {e}")
-                self._save_failed_email(mail_id, message)
-                failures += 1
+                    message_uid = imap_client.search_uid(message_id_header)
+                    if message_uid is None:
+                        raise Exception(f"Message UID not found for ID {message_id_header}, archiving skipped")
+                    
+                    imap_client.move_to_archive(message_uid)
+                    logger.debug(f"Mail archived ID {message_id_header}.")    
+        finally:
+            imap_client.disconnect()   
+        
 
-        logger.info(f"\nProcessed {len(email_ids)} emails with {failures} failures.")
-        if failures > 0:
-            raise Exception(f"\n{failures} emails failed to process. Check {self.error_dir} for details or rerun.")
-
-
-    def parse_message(self, message, mail_id) -> bool:
+    def parse_message(self, message) -> bool:
         try:
             self.parser_strategy.parse(message)
             archive_ready = True
         except UnparseableEmailException as e:
             archive_ready = False
-            logger.warning(f"✗ Failed to parse email ID {mail_id}: {e.__class__.__name__} - {e}")
+            logger.warning(f"Failed to parse email: {e.__class__.__name__} - {e}")
 
         return archive_ready
 

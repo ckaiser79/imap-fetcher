@@ -6,6 +6,8 @@ from lib.imap_client import IMAPClient
 from lib.process import MailProcessor
 from importlib import import_module
 from lib.setup_logger import setup_logging
+from lib.parser_strategy import EmailParserStrategy
+from lib.default_parser import DefaultPlainTextParser
 
 def load_parser(strategy_path: str):
     module_name, class_name = strategy_path.rsplit(".", 1)
@@ -48,25 +50,24 @@ def main():
 
     logger = setup_logging(config)
 
-    parser_strategy = None
+    parser_strategy: EmailParserStrategy = DefaultPlainTextParser()
     if config.get_bool("process_all") or config.exists("download"):    
         parser_strategy = load_parser(config.get("parser_strategy"))
         
     result: int = 0
 
-    client = IMAPClient(config)
-    try:
-        client.login()
-
-        if config.get_bool("process_all"):
-            processor = MailProcessor(client, parser_strategy, config)
-            try:
-                processor.process_all()
-            except Exception as e:
-                logger.error(f"Error processing emails: {e}")
-                print(f"Error processing emails: {e}")
-                result = 2
-        else:
+    if config.get_bool("process_all"):
+        processor = MailProcessor(parser_strategy, config)
+        try:
+            processor.process_all()
+        except Exception as e:
+            logger.error(f"Error processing emails: {e}")
+            print(f"Error processing emails: {e}")
+            result = 2
+    else:
+        client = IMAPClient(config)
+        try:
+            client.login()
     
             if config.get_bool("list"):
                 client.list_emails()
@@ -78,12 +79,11 @@ def main():
                 if config.get_bool("verbose"):
                     print(f"Downloaded email:\n{message.as_string()}")
 
-                if parser_strategy != None:
-                  parser_strategy.parse(message)
+                parser_strategy.parse(message)
             elif args.archive:
                 client.move_to_archive(config.get_int("archive"))
-    finally:
-        client.disconnect()
+        finally:
+            client.disconnect()
 
     exit(result)
 
